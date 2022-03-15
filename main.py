@@ -12,7 +12,10 @@ playlist = Playlist(url)
 
 # Download playlist
 for video in playlist.videos:
-    if convert == 'y':
-        video.streams.get_audio_only().download(SAVE_DOWNLOAD)
-    else:
-        video.streams.get_highest_resolution().download(SAVE_DOWNLOAD)
+    try:
+        if convert == 'y':
+            video.streams.get_audio_only().download(SAVE_DOWNLOAD)
+        else:
+            video.streams.get_highest_resolution().download(SAVE_DOWNLOAD)
+    except:
+        print('failed')
