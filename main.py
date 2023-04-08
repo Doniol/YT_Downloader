@@ -1,4 +1,4 @@
-from pytube import Playlist
+from pytube import Playlist, YouTube
 import os
 from pathlib import Path
 import re
@@ -22,42 +22,44 @@ if presence == 'y' and os.path.isfile("previous.pkl"):
     with open("previous.pkl", "rb") as file:
         alreadyDownloaded = pickle.load(file)
 
-# Download playlist
-for video in playlist.videos:
+print(playlist.title)
+for index, video_url in enumerate(playlist.video_urls):
     try:
-        title = video.title
+        yt = YouTube(video_url)
+        yt.streams.get_audio_only()
+        title = yt.title
+        print(title)
+
+        # For backwards compatibility with versions directly compared names without these characters
+        name = re.sub(r'[<>:\"/\\|?*\'.,$#@!%€&^]', '', title) + ".mp4"
+        # Add the original title to pickle
+        if name in existing:
+            alreadyDownloaded.append(title)
+            with open("previous.pkl", "wb") as file:
+                pickle.dump(alreadyDownloaded, file)
+
+        # Depending on if user wants to redownload files, download the file
+        if presence != 'y' or title not in alreadyDownloaded:
+            alreadyDownloaded.append(title)
+            with open("previous.pkl", "wb") as file:
+                pickle.dump(alreadyDownloaded, file)
+
+            try:
+                if convert == 'y':
+                    yt.streams.get_audio_only().download(SAVE_DOWNLOAD)
+                else:
+                    yt.streams.get_highest_resolution().download(SAVE_DOWNLOAD)
+                print("Downloaded Succesfully")
+            except Exception as e:
+                failedVideos.append(yt.watch_url)
+                print("Download Failed, Exception Occured: ")
+                print(e)
+        else:
+            print("Download Skipped")
+
     except Exception as e:
-        failedVideos.append(video.watch_url)
-        print("failed")
         print(e)
 
-    # For backwards compatibility with versions directly compared names without these characters
-    name = re.sub(r'[<>:\"/\\|?*\'.,$#@!%€&^]', '', title) + ".mp4"
-    # Add the original title to pickle
-    if name in existing:
-        alreadyDownloaded.append(title)
-        with open("previous.pkl", "wb") as file:
-            pickle.dump(alreadyDownloaded, file)
-
-    # Depending on if user wants to redownload files, download the file
-    if presence != 'y' or title not in alreadyDownloaded:
-        alreadyDownloaded.append(title)
-        with open("previous.pkl", "wb") as file:
-            pickle.dump(alreadyDownloaded, file)
-
-        try:
-            print(title)
-            if convert == 'y':
-                video.streams.get_audio_only().download(SAVE_DOWNLOAD)
-            else:
-                video.streams.get_highest_resolution().download(SAVE_DOWNLOAD)
-        except Exception as e:
-            failedVideos.append(video.watch_url)
-            print("failed")
-            print(e)
-    else:
-        print("SKIPPEDDDDDDDDDDDDD: " + title)
-    
-with open("failed.txt", "w") as file:
-    for entry in failedVideos:
-        file.write(entry + "\n")
+with open("failedDownloads.txt", "ab") as file:
+    for failure in failedVideos:
+        file.write(failure + "\n")
