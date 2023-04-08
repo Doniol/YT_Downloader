@@ -2,3 +2,5 @@
 Downloaded/
 .vscode/
 __pycache__/
+previous.pkl
+failed.txt
