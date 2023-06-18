@@ -14,6 +14,7 @@ presence = str(input("Do you want to skip previously downloaded files as mention
 url = str(input("Enter link to YT-playlist: "))
 convert = str(input("Download only audio instead of entire video? y/n "))
 playlist = Playlist(url)
+Path(SAVE_DOWNLOAD).mkdir(parents=True, exist_ok=True)
 existing = os.listdir(SAVE_DOWNLOAD)
 
 failedVideos = []
@@ -30,7 +31,7 @@ for index, video_url in enumerate(playlist.video_urls):
         title = yt.title
         print(title)
 
-        # For backwards compatibility with versions directly compared names without these characters
+        # For backwards compatibility with versions directly comparing names without these characters
         name = re.sub(r'[<>:\"/\\|?*\'.,$#@!%€&^]', '', title) + ".mp4"
         # Add the original title to pickle
         if name in existing:
