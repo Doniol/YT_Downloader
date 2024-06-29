@@ -3,6 +3,7 @@ import os
 from pathlib import Path
 import re
 import pickle
+import mutagen
 
 
 # Where to save the vids
@@ -10,56 +11,53 @@ PATH = Path.cwd()
 SAVE_DOWNLOAD = str(PATH.joinpath("Downloaded"))
 
 # Enter playlist
-presence = str(input("Do you want to skip previously downloaded files as mentioned in /previous.txt? y/n "))
+playlists = []
 url = str(input("Enter link to YT-playlist: "))
-convert = str(input("Download only audio instead of entire video? y/n "))
-playlist = Playlist(url)
-Path(SAVE_DOWNLOAD).mkdir(parents=True, exist_ok=True)
-existing = os.listdir(SAVE_DOWNLOAD)
+while url != "c":
+    playlists.append(Playlist(url))
+    url = str(input("Enter link to next YT-playlist (enter c to cancel): "))
 
 failedVideos = []
-alreadyDownloaded = []
-if presence == 'y' and os.path.isfile("previous.pkl"):
-    with open("previous.pkl", "rb") as file:
-        alreadyDownloaded = pickle.load(file)
 
-print(playlist.title)
-for index, video_url in enumerate(playlist.video_urls):
-    try:
+for playlist in playlists:
+    print(playlist.title)
+    for index, video_url in enumerate(playlist.video_urls):
         yt = YouTube(video_url)
         yt.streams.get_audio_only()
-        title = yt.title
+        # Get the name under which the video will be saved
+        title = os.path.splitext(yt.streams[0].default_filename)[0]
         print(title)
 
-        # For backwards compatibility with versions directly comparing names without these characters
-        name = re.sub(r'[<>:\"/\\|?*\'.,$#@!%€&^]', '', title) + ".mp4"
-        # Add the original title to pickle
-        if name in existing:
-            alreadyDownloaded.append(title)
-            with open("previous.pkl", "wb") as file:
-                pickle.dump(alreadyDownloaded, file)
-
-        # Depending on if user wants to redownload files, download the file
-        if presence != 'y' or title not in alreadyDownloaded:
-            alreadyDownloaded.append(title)
-            with open("previous.pkl", "wb") as file:
-                pickle.dump(alreadyDownloaded, file)
-
+        # Download the file
+        if title + ".mp4" not in os.listdir(SAVE_DOWNLOAD):
             try:
-                if convert == 'y':
-                    yt.streams.get_audio_only().download(SAVE_DOWNLOAD)
-                else:
-                    yt.streams.get_highest_resolution().download(SAVE_DOWNLOAD)
+                yt.streams.get_audio_only().download(SAVE_DOWNLOAD)
                 print("Downloaded Succesfully")
+
+                # Update file metadata 
+                with open(str(PATH.joinpath("Downloaded", "{}.mp4".format(title))), "r+b") as file:
+                    media_file = mutagen.File(file, easy=True)
+                    media_file['artist'] = yt.author
+                    media_file['genre'] = playlist.title
+                    media_file.save(file)
+
             except Exception as e:
                 failedVideos.append(yt.watch_url)
                 print("Download Failed, Exception Occured: ")
                 print(e)
+        
+        elif title + ".mp4" in os.listdir(SAVE_DOWNLOAD):
+            # Update file metadata 
+            with open(str(PATH.joinpath("Downloaded", "{}.mp4".format(title))), "r+b") as file:
+                media_file = mutagen.File(file, easy=True)
+                # If genre not already mentioned, add it
+                genres = media_file.pprint().split("genre=")[1]
+                if playlist.title not in genres.split(";"):
+                    media_file['genre'] = "{};{}".format(media_file.pprint().split("genre=")[1], playlist.title)
+                media_file.save(file)
+
         else:
             print("Download Skipped")
-
-    except Exception as e:
-        print(e)
 
 with open("failedDownloads.txt", "ab") as file:
     for failure in failedVideos:
